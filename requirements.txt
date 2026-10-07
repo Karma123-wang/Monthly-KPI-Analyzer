@@ -1,0 +1,8 @@
+streamlit
+pandas
+openpyxl
+plotly
+matplotlib
+reportlab
+python-pptx
+jinja2
