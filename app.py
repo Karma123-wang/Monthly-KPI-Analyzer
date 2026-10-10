@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from kpi_calc import (ER_ROW, TARGETS, WARD, auto_findings, by_ward, data_notes, discharge_hours, er_monthly, load,
+from kpi_calc import (ER_ROW, NOT_WARD_BEDS, TARGETS, WARD, auto_findings, by_ward, data_notes, discharge_hours, er_monthly, load,
                       monthly, status)
 from kpi_report import build_pdf, build_pptx, build_xlsx
 
@@ -28,7 +28,7 @@ st.markdown(f"""
       margin-bottom:14px; font-family:{FONT}; }}
   .pbi-header h1 {{ font-size:26px; margin:0; color:#FFF; font-weight:700; }}
   .pbi-header p {{ margin:4px 0 0 0; color:#E3F1FF; font-size:14px; }}
-  .kpi {{ background:#FFF; border-radius:6px; padding:12px 14px; height:122px; box-shadow:0 1px 3px rgba(0,0,0,.12);
+  .kpi {{ background:#FFF; border-radius:6px; padding:12px 14px; height:140px; box-shadow:0 1px 3px rgba(0,0,0,.12);
       border-top:4px solid {BLUE}; font-family:{FONT}; position:relative; }}
   .kpi.bad {{ border-top-color:{RED}; }} .kpi.good {{ border-top-color:{GREEN}; }}
   .kpi .v {{ font-size:30px; font-weight:700; color:#252423; line-height:1.1; }}
@@ -85,14 +85,16 @@ except ValueError as e:
     st.stop()
 
 beds = st.sidebar.number_input("Number of ward beds", min_value=1, value=40, step=1)
-all_months = list(monthly(df, beds).index)
+all_months = list(monthly(df, beds, wards=[w for w in df["ward"].unique() if w not in NOT_WARD_BEDS]).index)
 if not all_months:
     st.warning("No ward (IPD) admissions found in this file.")
     st.stop()
 start, end = st.sidebar.select_slider("Months", options=all_months, value=(all_months[0], all_months[-1]))
 months = all_months[all_months.index(start): all_months.index(end) + 1]
 ward_names = sorted(df.loc[df["setting"] == WARD, "ward"].unique())
-wards_sel = st.sidebar.multiselect("Wards", ward_names, default=ward_names)
+wards_sel = st.sidebar.multiselect("Wards", ward_names, default=[w for w in ward_names if w not in NOT_WARD_BEDS],
+                                   help="IPD patients recorded in the Emergency ward (and records without a ward) "
+                                        "are left out by default because they do not use the ward beds.")
 st.sidebar.caption("KPIs use ward inpatients (IPD) only. Emergency observation (ER IP) is shown separately "
                    "in its own tab.")
 
@@ -126,7 +128,9 @@ st.write("")
 row2 = st.columns(4)
 for col, (k, (label, unit, target, _)) in zip(row2, TARGETS.items()):
     v = r[k]
-    kpi(col, f"{v:.1f}{'%' if unit == '%' else ' days'}", f"{label}<br>Target {target}", status(k, v))
+    extra = (f"<br><b>{int(r['Discharged 9–11 am'])} of {int(r['Discharges'])}</b> patients discharged 9–11 am"
+             if k.startswith("KPI-56") else "")
+    kpi(col, f"{v:.1f}{'%' if unit == '%' else ' days'}", f"{label}{extra}<br>Target {target}", status(k, v))
 er_adm = int(er.loc[month, "Admissions"]) if month in er.index else 0
 kpi(row2[3], f"{int(r['Admissions']) + er_adm:,}",
     f"All admissions<br>ward {int(r['Admissions'])} + emergency obs. {er_adm}")

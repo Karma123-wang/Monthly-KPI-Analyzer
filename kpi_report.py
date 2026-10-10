@@ -241,7 +241,10 @@ def kpi_cards(m: pd.DataFrame, month: str, er=None):
              (f"{int(r['Referred out'])}", f"Referred to other facility ({r['Referral %']:.1f}%)", None)]
     for kpi, (label, unit, target, _) in TARGETS.items():
         v = r[kpi]
-        cards.append((f"{v:.1f}" + ("%" if unit == "%" else " d"), f"{label}  ·  target {target}", status(kpi, v)))
+        extra = (f"{int(r['Discharged 9–11 am'])} of {int(r['Discharges'])} patients discharged 9–11 am  ·  "
+                 if kpi.startswith("KPI-56") else "")
+        cards.append((f"{v:.1f}" + ("%" if unit == "%" else " d"), f"{label}  ·  {extra}target {target}",
+                      status(kpi, v)))
     cards.append((f"{int(r['Patient days']):,}", "Patient days", None))
     if er is not None and month in er.index:
         e = int(er.loc[month, "Admissions"])
@@ -378,8 +381,9 @@ def build_pdf(m, wards, hours, month, cover, notes=None, sections=None, data_not
             c.drawString(x + 16, y + kh - 46, value)
             c.setFillColor(MUTED)
             c.setFont("Helvetica", 10)
-            for j, line in enumerate(_wrap(label, int(kw / 5.2), 2)):
-                c.drawString(x + 16, y + kh - 66 - j * 12, line)
+            lines = [ln for part in label.split("  ·  ") for ln in _wrap(part, int(kw / 5.2), 2)][:3]
+            for j, line in enumerate(lines):
+                c.drawString(x + 16, y + kh - 64 - j * 11.5, line)
             if ok is not None:
                 c.setFont("Helvetica-Bold", 9)
                 c.setFillColor(GREEN if ok else RED)
