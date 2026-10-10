@@ -14,6 +14,7 @@ FMT = "%d/%m/%Y %H:%M"
 REFERRED = "REFERRED TO OTHER FACILITY"
 WARD, ER = "Ward (IPD)", "Emergency observation"
 ER_ROW = "Emergency observation (ER IP)"
+NOT_WARD_BEDS = ["Emergency", "Unknown"]   # IPD records not on the 40 ward beds; left out of ward KPIs by default
 
 # name: (label, unit, target text, check function, higher_is_better)
 TARGETS = {
@@ -102,7 +103,10 @@ def monthly(df: pd.DataFrame, beds: int = 40, include_er: bool = False, wards=No
     m["Inpatient days of discharged"] = disc.groupby(dm)["los"].sum()
     m["KPI-50 ALOS (days)"] = m["Inpatient days of discharged"] / m["Discharges"]
     m["Long stays (> 30 days)"] = disc[disc["los"] > 30].groupby(dm).size()
-    m["Patient days"] = _patient_days(d, end)
+    # Patients still admitted are counted up to the end of the data; records marked discharged but
+    # missing a discharge date are left out (otherwise they would look like they never left).
+    still_in = d["dis"].isna() & (d.get("Status", pd.Series("", index=d.index)) == "Admitted")
+    m["Patient days"] = _patient_days(d[d["dis"].notna() | still_in], end)
     m["Bed days available"] = [beds * p.days_in_month for p in m.index]
     m["KPI-51 Bed occupancy %"] = m["Patient days"] / m["Bed days available"] * 100
     m = m.fillna(0)
