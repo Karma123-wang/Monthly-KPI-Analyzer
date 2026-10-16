@@ -157,12 +157,14 @@ def by_ward(df: pd.DataFrame, months=None, include_er: bool = False) -> pd.DataF
         "Admissions": d.groupby("ward").size(),
         "Discharges": disc.groupby("ward").size(),
         "Referred out": disc[disc["outcome"] == REFERRED].groupby("ward").size(),
+        "Deaths": disc[disc["outcome"] == "EXPIRED"].groupby("ward").size(),
         "ALOS (days)": disc.groupby("ward")["los"].mean(),
         "Discharge before 11 am %": disc.groupby("ward")["dis"].apply(lambda s: (s.dt.hour < 11).mean() * 100),
     }).fillna(0)
     g["Admissions"] = g["Admissions"].astype(int)
     g["Discharges"] = g["Discharges"].astype(int)
     g["Referred out"] = g["Referred out"].astype(int)
+    g["Deaths"] = g["Deaths"].astype(int)
     if ER_ROW in g.index:                       # ALOS in days / before-11-am rule are ward measures
         g.loc[ER_ROW, ["ALOS (days)", "Discharge before 11 am %"]] = float("nan")
     g.index.name = "Ward"

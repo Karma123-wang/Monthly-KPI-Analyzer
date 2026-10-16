@@ -237,7 +237,7 @@ def chart_pages(m: pd.DataFrame, wards: pd.DataFrame, hours: pd.Series, sections
 
 def kpi_cards(m: pd.DataFrame, month: str, er=None):
     r = m.loc[month]
-    cards = [(f"{int(r['Admissions']):,}", "Admissions", None), (f"{int(r['Discharges']):,}", "Discharges", None),
+    cards = [(f"{int(r['Admissions']):,}", "Admissions", None), (f"{int(r['Discharges']):,}", f"Discharges (incl. {int(r['Deaths'])} death{'s' if int(r['Deaths']) != 1 else ''})", None),
              (f"{int(r['Referred out'])}", f"Referred to other facility ({r['Referral %']:.1f}%)", None)]
     for kpi, (label, unit, target, _) in TARGETS.items():
         v = r[kpi]

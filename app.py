@@ -129,7 +129,7 @@ month = st.selectbox("Month shown on the cards", list(m.index), index=len(m) - 1
 r = m.loc[month]
 row1 = st.columns(4)
 kpi(row1[0], f"{int(r['Admissions']):,}", "Admissions")
-kpi(row1[1], f"{int(r['Discharges']):,}", "Discharges")
+kpi(row1[1], f"{int(r['Discharges']):,}", f"Discharges<br><b>{int(r['Deaths'])}</b> death{'s' if int(r['Deaths']) != 1 else ''} in ward")
 kpi(row1[2], f"{int(r['Referred out'])}", f"Referred to other facility<br>({r['Referral %']:.1f}% of discharges)")
 kpi(row1[3], f"{int(r['Patient days']):,}", f"Patient days<br>(of {int(r['Bed days available']):,} bed days)")
 st.write("")
@@ -250,7 +250,7 @@ with tab_ward:
         wsub = wa.drop(index=ER_ROW, errors="ignore")
 
         def total_row(t, name):
-            s = t[["Admissions", "Discharges", "Referred out"]].sum()
+            s = t[["Admissions", "Discharges", "Referred out", "Deaths"]].sum()
             return pd.DataFrame([{**s.to_dict(), "ALOS (days)": float("nan"), "Discharge before 11 am %": float("nan")}],
                                 index=[name])
 
@@ -260,7 +260,7 @@ with tab_ward:
         table = pd.concat(rows)
         table.index.name = "Ward"
         st.dataframe(table.style.format({"Admissions": "{:,.0f}", "Discharges": "{:,.0f}", "Referred out": "{:,.0f}",
-                                         "ALOS (days)": "{:.1f}", "Discharge before 11 am %": "{:.1f}"}, na_rep="–")
+                                         "Deaths": "{:,.0f}", "ALOS (days)": "{:.1f}", "Discharge before 11 am %": "{:.1f}"}, na_rep="–")
                      .apply(lambda r: ["font-weight:700;background-color:#EAF4FF" if str(r.name).isupper() else
                                        ("background-color:#F3EEFC" if r.name == ER_ROW else "") for _ in r], axis=1),
                      use_container_width=True)
