@@ -99,6 +99,14 @@ st.sidebar.caption("KPIs use ward inpatients (IPD) only. Emergency observation (
                    "in its own tab.")
 
 m = monthly(df, beds, wards=wards_sel)
+if "Discharged before 11 am" not in m.columns:      # safety net if an older kpi_calc.py is deployed
+    st.warning("⚠️ kpi_calc.py on GitHub is an older version – please upload the new kpi_calc.py. "
+               "KPI-56 has been recalculated here as 'discharged before 11 am'.")
+    _d = df[(df["setting"] == WARD) & df["ward"].isin(wards_sel) & df["dis"].notna()]
+    _dm = _d["dis"].dt.to_period("M").dt.strftime("%b %Y")
+    m["Discharged before 11 am"] = (_d[_d["dis"].dt.hour < 11].groupby(_dm).size()
+                                    .reindex(m.index).fillna(0).astype(int))
+    m["KPI-56 Discharge before 11 am %"] = m["Discharged before 11 am"] / m["Discharges"].replace(0, 1) * 100
 m = m.loc[[x for x in months if x in m.index]]
 if m.empty:
     st.warning("No data for the selected months / wards.")
