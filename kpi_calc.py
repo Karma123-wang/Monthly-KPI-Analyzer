@@ -3,7 +3,7 @@
 Definitions follow the BHSQA KPI user guide (QASD, MoH):
   KPI-50  ALOS = inpatient days of patients discharged in the month / patients discharged   (target <= 6 days)
   KPI-51  Bed occupancy = inpatient days in the month / available bed days x 100            (target 70-80 %)
-  KPI-56  Discharged between 9 am and 11 am / all patients discharged x 100                  (target > 90 %)
+  KPI-56  Discharged before 11 am / all patients discharged x 100                  (target > 90 %)
 Patients admitted and discharged the same day count as a 1-day stay.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ NOT_WARD_BEDS = ["Emergency", "Unknown"]   # IPD records not on the 40 ward beds
 
 # name: (label, unit, target text, check function, higher_is_better)
 TARGETS = {
-    "KPI-56 Discharge 9–11 am %": ("KPI-56 Discharged 9–11 am", "%", "> 90%", lambda v: v > 90),
+    "KPI-56 Discharge before 11 am %": ("KPI-56 Discharged before 11 am", "%", "> 90%", lambda v: v > 90),
     "KPI-50 ALOS (days)": ("KPI-50 Average length of stay", "days", "≤ 6 days", lambda v: v <= 6),
     "KPI-51 Bed occupancy %": ("KPI-51 Bed occupancy rate", "%", "70–80%", lambda v: 70 <= v <= 80),
 }
@@ -96,8 +96,8 @@ def monthly(df: pd.DataFrame, beds: int = 40, include_er: bool = False, wards=No
     m["Deaths"] = disc[disc["outcome"] == "EXPIRED"].groupby(dm).size()
     m["LAMA / absconded"] = disc[disc["outcome"].isin(["LAMA", "ABSCONDED"])].groupby(dm).size()
     h = disc["dis"].dt.hour
-    m["Discharged 9–11 am"] = disc[(h >= 9) & (h < 11)].groupby(dm).size()
-    m["KPI-56 Discharge 9–11 am %"] = m["Discharged 9–11 am"] / m["Discharges"] * 100
+    m["Discharged before 11 am"] = disc[h < 11].groupby(dm).size()
+    m["KPI-56 Discharge before 11 am %"] = m["Discharged before 11 am"] / m["Discharges"] * 100
     m["Discharged before 9 am"] = disc[h < 9].groupby(dm).size()
     m["Discharged after 11 am"] = disc[h >= 11].groupby(dm).size()
     m["Inpatient days of discharged"] = disc.groupby(dm)["los"].sum()
@@ -110,7 +110,7 @@ def monthly(df: pd.DataFrame, beds: int = 40, include_er: bool = False, wards=No
     m["Bed days available"] = [beds * p.days_in_month for p in m.index]
     m["KPI-51 Bed occupancy %"] = m["Patient days"] / m["Bed days available"] * 100
     m = m.fillna(0)
-    for c in ["Admissions", "Discharges", "Referred out", "Deaths", "LAMA / absconded", "Discharged 9–11 am",
+    for c in ["Admissions", "Discharges", "Referred out", "Deaths", "LAMA / absconded", "Discharged before 11 am",
               "Discharged before 9 am", "Discharged after 11 am", "Inpatient days of discharged",
               "Long stays (> 30 days)", "Patient days", "Bed days available"]:
         m[c] = m[c].astype(int)
@@ -158,13 +158,13 @@ def by_ward(df: pd.DataFrame, months=None, include_er: bool = False) -> pd.DataF
         "Discharges": disc.groupby("ward").size(),
         "Referred out": disc[disc["outcome"] == REFERRED].groupby("ward").size(),
         "ALOS (days)": disc.groupby("ward")["los"].mean(),
-        "Discharge 9–11 am %": disc.groupby("ward")["dis"].apply(lambda s: ((s.dt.hour >= 9) & (s.dt.hour < 11)).mean() * 100),
+        "Discharge before 11 am %": disc.groupby("ward")["dis"].apply(lambda s: (s.dt.hour < 11).mean() * 100),
     }).fillna(0)
     g["Admissions"] = g["Admissions"].astype(int)
     g["Discharges"] = g["Discharges"].astype(int)
     g["Referred out"] = g["Referred out"].astype(int)
-    if ER_ROW in g.index:                       # ALOS in days / 9–11 am rule are ward measures
-        g.loc[ER_ROW, ["ALOS (days)", "Discharge 9–11 am %"]] = float("nan")
+    if ER_ROW in g.index:                       # ALOS in days / before-11-am rule are ward measures
+        g.loc[ER_ROW, ["ALOS (days)", "Discharge before 11 am %"]] = float("nan")
     g.index.name = "Ward"
     g = g.sort_values("Admissions", ascending=False)
     return pd.concat([g.drop(index=ER_ROW, errors="ignore"), g.loc[[x for x in [ER_ROW] if x in g.index]]])

@@ -128,7 +128,7 @@ st.write("")
 row2 = st.columns(4)
 for col, (k, (label, unit, target, _)) in zip(row2, TARGETS.items()):
     v = r[k]
-    extra = (f"<br><b>{int(r['Discharged 9–11 am'])} of {int(r['Discharges'])}</b> patients discharged 9–11 am"
+    extra = (f"<br><b>{int(r['Discharged before 11 am'])} of {int(r['Discharges'])}</b> patients discharged before 11 am"
              if k.startswith("KPI-56") else "")
     kpi(col, f"{v:.1f}{'%' if unit == '%' else ' days'}", f"{label}{extra}<br>Target {target}", status(k, v))
 er_adm = int(er.loc[month, "Admissions"]) if month in er.index else 0
@@ -145,8 +145,8 @@ tab_table, tab_trend, tab_ward, tab_time, tab_er, tab_export = st.tabs(
 with tab_table:
     with st.container(key="card_table"):
         card_title("Monthly KPIs – red = target not met, green = target met")
-        show = m[["Admissions", "Discharges", "Referred out", "Referral %", "Discharged 9–11 am",
-                  "KPI-56 Discharge 9–11 am %", "KPI-50 ALOS (days)", "Patient days", "KPI-51 Bed occupancy %",
+        show = m[["Admissions", "Discharges", "Referred out", "Referral %", "Discharged before 11 am",
+                  "KPI-56 Discharge before 11 am %", "KPI-50 ALOS (days)", "Patient days", "KPI-51 Bed occupancy %",
                   "Deaths", "LAMA / absconded", "Long stays (> 30 days)"]]
 
         def colour(v, col):
@@ -155,12 +155,12 @@ with tab_table:
 
         total_row = show.sum(numeric_only=True)
         total_row["Referral %"] = total_row["Referred out"] / max(1, total_row["Discharges"]) * 100
-        total_row["KPI-56 Discharge 9–11 am %"] = total_row["Discharged 9–11 am"] / max(1, total_row["Discharges"]) * 100
+        total_row["KPI-56 Discharge before 11 am %"] = total_row["Discharged before 11 am"] / max(1, total_row["Discharges"]) * 100
         total_row["KPI-50 ALOS (days)"] = m["Inpatient days of discharged"].sum() / max(1, total_row["Discharges"])
         total_row["KPI-51 Bed occupancy %"] = total_row["Patient days"] / max(1, m["Bed days available"].sum()) * 100
         show = pd.concat([show, total_row.to_frame(f"TOTAL ({len(m)} months)").T])
         fmt = {c: "{:,.0f}" for c in show.columns}
-        fmt.update({c: "{:.1f}" for c in ["Referral %", "KPI-56 Discharge 9–11 am %", "KPI-50 ALOS (days)",
+        fmt.update({c: "{:.1f}" for c in ["Referral %", "KPI-56 Discharge before 11 am %", "KPI-50 ALOS (days)",
                                          "KPI-51 Bed occupancy %"]})
         styler = show.style.format(fmt).apply(
             lambda r: ["font-weight:700;background-color:#EAF4FF" if str(r.name).startswith("TOTAL") else ""
@@ -176,7 +176,7 @@ with tab_table:
 # ---------------- Trends ----------------
 with tab_trend:
     c1, c2, c3 = st.columns(3)
-    specs = [(c1, "KPI-56 Discharge 9–11 am %", "KPI-56 Discharged 9–11 am (> 90%)", 90, None, "%"),
+    specs = [(c1, "KPI-56 Discharge before 11 am %", "KPI-56 Discharged before 11 am (> 90%)", 90, None, "%"),
              (c2, "KPI-50 ALOS (days)", "KPI-50 ALOS (≤ 6 days)", 6, None, ""),
              (c3, "KPI-51 Bed occupancy %", "KPI-51 Bed occupancy (70–80%)", None, (70, 80), "%")]
     for col, k, title, line, band, suf in specs:
@@ -243,7 +243,7 @@ with tab_ward:
 
         def total_row(t, name):
             s = t[["Admissions", "Discharges", "Referred out"]].sum()
-            return pd.DataFrame([{**s.to_dict(), "ALOS (days)": float("nan"), "Discharge 9–11 am %": float("nan")}],
+            return pd.DataFrame([{**s.to_dict(), "ALOS (days)": float("nan"), "Discharge before 11 am %": float("nan")}],
                                 index=[name])
 
         rows = [wsub, total_row(wsub, "WARD TOTAL (IPD)")]
@@ -252,11 +252,11 @@ with tab_ward:
         table = pd.concat(rows)
         table.index.name = "Ward"
         st.dataframe(table.style.format({"Admissions": "{:,.0f}", "Discharges": "{:,.0f}", "Referred out": "{:,.0f}",
-                                         "ALOS (days)": "{:.1f}", "Discharge 9–11 am %": "{:.1f}"}, na_rep="–")
+                                         "ALOS (days)": "{:.1f}", "Discharge before 11 am %": "{:.1f}"}, na_rep="–")
                      .apply(lambda r: ["font-weight:700;background-color:#EAF4FF" if str(r.name).isupper() else
                                        ("background-color:#F3EEFC" if r.name == ER_ROW else "") for _ in r], axis=1),
                      use_container_width=True)
-        st.caption("ALOS and the 9–11 am discharge rate are ward measures, so they are not shown (–) for emergency "
+        st.caption("ALOS and the before-11-am discharge rate are ward measures, so they are not shown (–) for emergency "
                    "observation. Ward KPIs never include emergency observation.")
         fig = go.Figure()
         fig.add_bar(y=list(wt.index), x=wt["ALOS (days)"], orientation="h",
@@ -290,15 +290,15 @@ with tab_ward:
 with tab_time:
     with st.container(key="card_time"):
         total = max(1, hours.sum())
-        card_title(f"Discharges by hour – {hours.loc[9:10].sum() / total * 100:.0f}% between 9 and 11 am, "
+        card_title(f"Discharges by hour – {hours.loc[:10].sum() / total * 100:.0f}% before 11 am, "
                    f"{hours.loc[11:].sum() / total * 100:.0f}% after 11 am")
         h = hours.loc[6:22]
         fig = go.Figure()
         fig.add_bar(x=[f"{i}:00" for i in h.index], y=h.values,
-                    marker_color=[GREEN if 9 <= i < 11 else (ORANGE if i >= 11 else "#A19F9D") for i in h.index],
+                    marker_color=[GREEN if i < 11 else ORANGE for i in h.index],
                     text=h.values, textposition="outside", hovertemplate="%{x}: %{y} discharges<extra></extra>")
         st.plotly_chart(style(fig, 380), use_container_width=True, key="hours")
-        st.caption("Green = 9–11 am window counted by KPI-56 · orange = after 11 am · grey = before 9 am.")
+        st.caption("Green = before 11 am (counted by KPI-56) · orange = 11 am or later.")
 
 # ---------------- Emergency observation ----------------
 with tab_er:
@@ -393,7 +393,7 @@ with tab_export:
         n1, n2 = st.columns(2)
         n1.text_area("Key findings", key="ed_findings", height=230)
         n2.text_area("Recommendations", key="ed_recs", height=230,
-                     placeholder="e.g. Start ward discharge rounds at 8 am so patients leave between 9 and 11 am")
+                     placeholder="e.g. Start ward discharge rounds at 8 am so patients leave before 11 am")
         if n1.button("↺ Refill findings from the data"):
             ss["refill_findings"] = True
             st.rerun()

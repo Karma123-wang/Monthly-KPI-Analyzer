@@ -75,7 +75,7 @@ def chart_pages(m: pd.DataFrame, wards: pd.DataFrame, hours: pd.Series, sections
     if "table" in secs:
         rows = [("Admissions", "Admissions", "{:,.0f}"), ("Discharges", "Discharges", "{:,.0f}"),
                 ("Referred out", "Referred to other facility", "{:,.0f}"), ("Referral %", "Referral % of discharges", "{:.1f}%"),
-                ("KPI-56 Discharge 9–11 am %", "KPI-56 Discharged 9–11 am (>90%)", "{:.1f}%"),
+                ("KPI-56 Discharge before 11 am %", "KPI-56 Discharged before 11 am (>90%)", "{:.1f}%"),
                 ("KPI-50 ALOS (days)", "KPI-50 ALOS (≤6 days)", "{:.1f}"),
                 ("Patient days", "Patient days", "{:,.0f}"),
                 ("KPI-51 Bed occupancy %", "KPI-51 Bed occupancy (70–80%)", "{:.1f}%"),
@@ -113,7 +113,7 @@ def chart_pages(m: pd.DataFrame, wards: pd.DataFrame, hours: pd.Series, sections
     if "trends" in secs:
         fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
         k56, k50, k51 = (m[k].tolist() for k in TARGETS)
-        _kpi_line(axes[0], months, k56, "KPI-56 Discharged 9–11 am", "> 90%", lambda v: v > 90, "%", line=90)
+        _kpi_line(axes[0], months, k56, "KPI-56 Discharged before 11 am", "> 90%", lambda v: v > 90, "%", line=90)
         _kpi_line(axes[1], months, k50, "KPI-50 Average length of stay", "≤ 6 days", lambda v: v <= 6, "days", line=6)
         _kpi_line(axes[2], months, k51, "KPI-51 Bed occupancy", "70–80%", lambda v: 70 <= v <= 80, "%", band=(70, 80))
         fig.tight_layout(w_pad=3)
@@ -174,11 +174,11 @@ def chart_pages(m: pd.DataFrame, wards: pd.DataFrame, hours: pd.Series, sections
         axes[0].spines["left"].set_visible(False)
         axes[0].tick_params(length=0)
         hrs = hours.loc[6:22]
-        cols = [GREEN if 9 <= h < 11 else (ORANGE if h >= 11 else MUTED) for h in hrs.index]
+        cols = [GREEN if h < 11 else ORANGE for h in hrs.index]
         axes[1].bar([f"{h}" for h in hrs.index], hrs.values, color=cols, width=0.75)
         axes[1].set_title("Discharges by hour of day\n", loc="left", fontsize=11.5, fontweight="bold")
         total = max(1, hours.sum())
-        axes[1].text(0, 1.02, f"Green = 9–11 am ({hours.loc[9:10].sum() / total * 100:.0f}%) · "
+        axes[1].text(0, 1.02, f"Green = before 11 am ({hours.loc[:10].sum() / total * 100:.0f}%) · "
                               f"orange = after 11 am ({hours.loc[11:].sum() / total * 100:.0f}%)",
                      transform=axes[1].transAxes, fontsize=8.5, color=MUTED)
         axes[1].set_xlabel("Hour (24-h clock)")
@@ -241,7 +241,7 @@ def kpi_cards(m: pd.DataFrame, month: str, er=None):
              (f"{int(r['Referred out'])}", f"Referred to other facility ({r['Referral %']:.1f}%)", None)]
     for kpi, (label, unit, target, _) in TARGETS.items():
         v = r[kpi]
-        extra = (f"{int(r['Discharged 9–11 am'])} of {int(r['Discharges'])} patients discharged 9–11 am  ·  "
+        extra = (f"{int(r['Discharged before 11 am'])} of {int(r['Discharges'])} patients discharged before 11 am  ·  "
                  if kpi.startswith("KPI-56") else "")
         cards.append((f"{v:.1f}" + ("%" if unit == "%" else " d"), f"{label}  ·  {extra}target {target}",
                       status(kpi, v)))
@@ -596,11 +596,11 @@ def build_xlsx(m, wards, cover, data_notes=None, er=None) -> bytes:
     ws["A1"].font = Font(bold=True, size=15, color=BLUE[1:])
     ws["A2"] = " · ".join(x for x in (cover.get("role"), cover.get("author"), cover.get("period_line")) if x)
     ws["A2"].font = Font(italic=True, color="605E5C")
-    cols = ["Admissions", "Discharges", "Referred out", "Referral %", "Discharged 9–11 am", "KPI-56 Discharge 9–11 am %",
+    cols = ["Admissions", "Discharges", "Referred out", "Referral %", "Discharged before 11 am", "KPI-56 Discharge before 11 am %",
             "Inpatient days of discharged", "KPI-50 ALOS (days)", "Patient days", "Bed days available",
             "KPI-51 Bed occupancy %", "Deaths", "LAMA / absconded", "Long stays (> 30 days)"]
     header = ["Month"] + cols
-    targets = {"KPI-56 Discharge 9–11 am %": "> 90%", "KPI-50 ALOS (days)": "≤ 6", "KPI-51 Bed occupancy %": "70–80%"}
+    targets = {"KPI-56 Discharge before 11 am %": "> 90%", "KPI-50 ALOS (days)": "≤ 6", "KPI-51 Bed occupancy %": "70–80%"}
     for j, h in enumerate(header, 1):
         cl = ws.cell(row=4, column=j, value=h)
         cl.fill, cl.font, cl.border = head_fill, head_font, border
@@ -625,7 +625,7 @@ def build_xlsx(m, wards, cover, data_notes=None, er=None) -> bytes:
     r = 6 + len(m) + 1
     ws.cell(row=r, column=1, value="Definitions (BHSQA KPI user guide)").font = Font(bold=True)
     for k, line in enumerate([
-        "KPI-56: patients discharged between 9 am and 11 am ÷ all patients discharged in the month × 100 (target > 90%).",
+        "KPI-56: patients discharged before 11 am ÷ all patients discharged in the month × 100 (target > 90%).",
         "KPI-50: inpatient days of patients discharged in the month ÷ patients discharged (target ≤ 6 days). "
         "Same-day stay = 1 day.",
         "KPI-51: inpatient (patient) days in the month ÷ available bed days × 100 (target 70–80%).",
